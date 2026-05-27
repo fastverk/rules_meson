@@ -1,0 +1,15 @@
+load("//meson:meson_configure.bzl", "meson_configure")
+
+# M0 smoke target: confirms meson_configure works end-to-end against a
+# 2-line meson project. If this builds, the rules_meson toolchain
+# (vendored meson + ninja, runner py_binary, path relativization) is
+# functional. Output: bazel-bin/examples/hello/hello_compdb.compile_commands.json
+# with one entry for hello.c.
+meson_configure(
+    name = "hello_compdb",
+    srcs = [
+        "meson.build",
+        "hello.c",
+    ],
+    marker = "meson.build",
+)

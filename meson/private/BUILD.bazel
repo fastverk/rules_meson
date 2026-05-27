@@ -1,0 +1,11 @@
+load("@rules_python//python:py_binary.bzl", "py_binary")
+
+# Action executable for the meson_configure rule. Imports mesonbuild as
+# a py_library dep so we don't nest py_binary subprocess invocations
+# (runfiles discovery walls).
+py_binary(
+    name = "meson_runner",
+    srcs = ["meson_runner.py"],
+    deps = ["@meson_dist//:mesonbuild"],
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,36 @@
+"""rules_meson — hermetic meson → Bazel tooling.
+
+PRIVATE / LOCAL-ONLY. Not published, not registered, not pushed to a
+GitHub remote. Same dev arrangement as rules_lang / rules_owl.
+
+This module provides:
+
+  - `meson_tools` extension that http_archives meson 1.7.1 source and
+    http_files prebuilt ninja 1.12.1 (sha256-pinned). No system PATH
+    dependency.
+  - `meson_configure` build rule that runs `meson setup` hermetically
+    via the runner py_binary, captures compile_commands.json, and
+    relativizes paths so the output is portable across sandboxes.
+
+The future scope (per project_postgres_bazel_native memory) adds:
+  - `meson_to_bazel` rule: introspection-driven BUILD overlay generator.
+  - `bison_target` + `flex_target` rules mirroring meson's macros.
+
+For now (M0): just the scaffold + meson_configure. rules_postgres
+consumes meson_configure and wraps it with Postgres-specific defaults.
+"""
+
+module(
+    name = "rules_meson",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "bazel_skylib", version = "1.8.2")
+bazel_dep(name = "rules_python", version = "1.7.0")
+bazel_dep(name = "rules_cc", version = "0.2.17")
+
+# Hermetic meson + ninja. Fetched via http_archive / http_file with
+# sha256 pins; see meson/meson_tools.bzl for versions + URLs.
+meson_tools = use_extension("//meson:meson_tools.bzl", "meson_tools")
+use_repo(meson_tools, "meson_dist", "ninja_dist")
