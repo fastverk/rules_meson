@@ -1,0 +1,70 @@
+// build-IR — Layer B of the build-translation stack (see polyglot docs
+// build-ir-seams.md). A typed, frontend-agnostic build graph: targets with
+// their sources / flags / dependency edges, plus the codegen steps that
+// produce sources. One frontend per source build system (meson, moz.build)
+// emits a BuildGraph; one backend per target build system (Bazel) consumes it.
+//
+// This is the schema the meson + mozbuild frontends share, and is the thing
+// that would move into the shared `build-ir` module (alongside a
+// `translator-core` harness shared with rules_ci_ir) once the mozbuild frontend
+// lands. Kept here in rules_meson for the M0 → meson_to_bazel slice.
+//
+// Layer A (per-TU compile facts + identity) is NOT this proto — it is Kythe's
+// `CompilationUnit` / `VName`. Each Target below down-projects to a set of
+// Kythe CompilationUnits; `corpus` + `name` are the VName basis. build-IR adds
+// the target grouping + dependency + codegen structure that a flat
+// compile_commands.json / CompilationUnit stream cannot express.
+
+syntax = "proto3";
+
+package build_ir.v1;
+
+enum TargetKind {
+  TARGET_KIND_UNSPECIFIED = 0;
+  TARGET_KIND_LIBRARY = 1;     // static or shared library
+  TARGET_KIND_EXECUTABLE = 2;
+  TARGET_KIND_GENERATED = 3;   // a codegen step (meson custom_target / moz GeneratedFile)
+}
+
+enum Language {
+  LANGUAGE_UNSPECIFIED = 0;
+  LANGUAGE_C = 1;
+  LANGUAGE_CXX = 2;
+  LANGUAGE_RUST = 3;
+}
+
+// A codegen step that produces source/header files consumed by other targets.
+message Codegen {
+  repeated string command = 1;   // argv that produces the outputs
+  repeated string inputs = 2;    // declared input files (repo-relative)
+  repeated string outputs = 3;   // generated files (repo-relative)
+}
+
+message Target {
+  string name = 1;                 // component-unique target id
+  TargetKind kind = 2;
+  Language language = 3;
+
+  // Compile inputs (repo-relative). Empty for GENERATED targets.
+  repeated string sources = 4;
+  repeated string headers = 5;
+
+  // Recovered from the compiler invocation.
+  repeated string includes = 6;    // -I dirs (repo-relative)
+  repeated string defines = 7;     // -D macros (without the -D)
+  repeated string copts = 8;       // remaining compile flags
+
+  // Names of other Targets in this graph this one depends on. Recovered from
+  // the link line (output-filename match) and from consumed codegen outputs.
+  repeated string deps = 9;
+
+  Codegen codegen = 10;            // set iff kind == TARGET_KIND_GENERATED
+
+  string component = 11;           // owning component, for the decomposition cut
+}
+
+message BuildGraph {
+  string corpus = 1;               // Kythe VName corpus (e.g. "firefox")
+  string root = 2;                 // source root the paths are relative to
+  repeated Target targets = 3;
+}
