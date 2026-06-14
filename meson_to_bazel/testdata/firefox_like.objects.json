@@ -1,0 +1,17 @@
+[
+  {"type": "StaticLibrary", "context": "xpcom/base", "name": "xpcom"},
+  {"type": "Sources", "context": "xpcom/base", "files": ["nsCOMPtr.cpp"]},
+
+  {"type": "GeneratedFile", "context": "dom/bindings", "name": "FooBinding",
+   "script": "Codegen.py", "method": "codegen",
+   "inputs": ["Foo.webidl"], "outputs": ["FooBinding.cpp", "FooBinding.h"]},
+  {"type": "StaticLibrary", "context": "dom/bindings", "name": "dombindings",
+   "use_libs": ["xpcom"]},
+  {"type": "UnifiedSources", "context": "dom/bindings", "files": ["FooBinding.cpp"]},
+  {"type": "Sources", "context": "dom/bindings", "files": ["BindingUtils.cpp"]},
+  {"type": "Defines", "context": "dom/bindings", "defines": {"MOZILLA_INTERNAL_API": true}},
+  {"type": "LocalInclude", "context": "dom/bindings", "path": "/dom/bindings"},
+
+  {"type": "Program", "context": "browser/app", "name": "firefox", "use_libs": ["dombindings"]},
+  {"type": "Sources", "context": "browser/app", "files": ["nsBrowserApp.cpp"]}
+]

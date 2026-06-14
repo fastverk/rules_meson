@@ -34,7 +34,17 @@ def _genrule_cmd(command, n_outputs):
 
     if len(command) >= 3 and command[0].rsplit("/", 1)[-1] in ("sh", "bash") and command[1] == "-c":
         return sub(command[2])
-    return " ".join(shlex.quote(sub(a)) for a in command)
+    # Emit make-var placeholders unquoted (they must expand + word-split);
+    # shell-quote every other argument.
+    parts = []
+    for a in command:
+        if a == "{OUTPUT}":
+            parts.append(out_var)
+        elif a == "{INPUT}":
+            parts.append("$(SRCS)")
+        else:
+            parts.append(shlex.quote(sub(a)))
+    return " ".join(parts)
 
 
 def _strlist(name, values, indent="    "):
@@ -99,8 +109,10 @@ def emit(graph):
                     srcs += gen_outputs[d]
                 else:                           # library: a label dep
                     deps.append(":" + d)
-            t["srcs_resolved"] = srcs
-            t["deps_resolved"] = deps
+            # A generated .cpp can be both a declared source and a folded codegen
+            # output; order-preserving dedup keeps one.
+            t["srcs_resolved"] = list(dict.fromkeys(srcs))
+            t["deps_resolved"] = list(dict.fromkeys(deps))
 
     blocks = ['load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")', ""]
     for t in targets:
