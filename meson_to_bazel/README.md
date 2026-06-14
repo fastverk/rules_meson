@@ -47,14 +47,45 @@ python3 meson_frontend.py targets.json --root <srcroot> --corpus myproj > graph.
 python3 emit_bazel.py graph.json > BUILD.bazel
 ```
 
+## Files
+
+- `build_ir.proto`, `emit_bazel.py` — the shared schema + Bazel backend.
+- `meson_frontend.py` — meson `introspect --targets` → `BuildGraph`.
+- `mozbuild_frontend.py` — mozbuild emitter objects (JSON) → `BuildGraph`.
+- `mozbuild_backend.py` — the `./mach build-backend -b BuildIR` backend that
+  produces that JSON from a configured mozilla-central.
+- `emit_kythe.py` — Layer-A down-projection: `BuildGraph` → Kythe
+  `CompilationUnit`s (the seam to the source symbol graph).
+- `validate_partition.py` — the decomposition-validation gate (build-dep cut vs.
+  symbol-reference graph).
+- `test_*.py` — golden + unit tests, runnable with no meson/bazel/mozilla tree.
+
+## mozbuild frontend — validation status
+
+The mozbuild path is **validated against the real Mozilla object model**
+(gecko-dev `python/mozbuild/mozbuild/frontend/{data,emitter}.py`):
+
+- `mozbuild_backend.py` is written against the verified real attributes — context
+  = `relsrcdir`, library name = `basename`, program name = `program`, deps =
+  `linked_libraries` (resolved `Library` objects, keyed by `.basename`, **not** the
+  raw `USE_LIBS` strings), `Sources.files`, `GeneratedFile.{script,method,inputs,
+  outputs}`, `Defines.defines`, `LocalInclude.path`.
+- `test_mozbuild_backend.py` feeds `record()` test doubles shaped with those exact
+  attributes and confirms the full chain (objects → backend → frontend → Bazel)
+  reproduces the golden — so the hand-authored fixture is faithful.
+
+**Residual, pinned by a live run** (needs a configured mozilla-central + one
+`./mach build-backend -b BuildIR`): the exact string form of `SourcePath`/`Path`
+in the dump (topsrcdir-absolute vs. context-relative). `mozbuild_frontend._ctx_rel`
+already normalizes both, but only a live run confirms which Mozilla emits.
+
 ## Known gaps (next passes)
 
-- **Generated-source consume edge.** `introspect --targets` does not surface a
-  library *consuming* a `custom_target` output as a source (only the codegen
-  step itself). Recovering produces→consumes for generated headers needs the
-  ninja graph (`ninja -t deps`). Link deps are recovered cleanly today.
+- **Generated-source consume edge (meson).** `introspect --targets` does not
+  surface a library *consuming* a `custom_target` output (only the codegen step);
+  recovering produces→consumes needs the ninja graph (`ninja -t deps`). The
+  mozbuild frontend *does* recover it (a source matching a `GeneratedFile` output).
 - **Rust / linker libs / system deps / generated-include dirs** — not yet mapped.
-- **`translator-core` + Kythe `CompilationUnit` emit** — the IR is in place; the
-  harness extraction and the Layer-A down-projection are the next steps.
-- **mozbuild frontend** — the second frontend (`TreeMetadataEmitter` →
-  `BuildGraph`), which is what the Firefox decomposition consumes.
+- **`translator-core` extraction** — factor the parse→IR→emit+theorem harness
+  shared with the CI-config translator.
+- **Live `mach` validation** — run the backend on a configured tree (above).
